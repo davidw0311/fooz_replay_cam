@@ -14,6 +14,9 @@ from picamera2 import Picamera2
 from picamera2.encoders import JpegEncoder
 from picamera2.outputs import FileOutput
 
+import cv2
+import numpy as np
+
 PAGE = """\
 <html>
 <head>
@@ -40,6 +43,7 @@ class StreamingOutput(io.BufferedIOBase):
 
 class StreamingHandler(server.BaseHTTPRequestHandler):
     def do_GET(self):
+        self.imageProcessor = ImageProcessor()
         if self.path == '/':
             self.send_response(301)
             self.send_header('Location', '/index.html')
@@ -63,6 +67,10 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                     with output.condition:
                         output.condition.wait()
                         frame = output.frame
+                        data_array = np.frombuffer(frame,dtype=np.uint8)
+                        image = cv2.imdecode(data_array, cv2.IMREAD_COLOR)
+                        self.imageProcessor.processFrame(image)
+                        
                     self.wfile.write(b'--FRAME\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', len(frame))
@@ -82,6 +90,22 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
+class ImageProcessor():
+    def __init__(self):
+        self.last_frame = None
+        self.count = 0
+        
+    def processFrame(self, frame):
+        pass
+        # self.count += 1
+        # if self.last_frame is None:
+        #    self.last_frame = frame
+        # else:
+        #    self.last_frame = frame
+        #    if self.count%100 == 0:
+        #        subtraction_frame = np.abs(frame - self.last_frame)
+        #        cv2.imwrite(f"{self.count}.jpg", subtraction_frame)
+                
 
 picam2 = Picamera2()
 picam2.configure(picam2.create_video_configuration(main={"size": (640, 480)}))
